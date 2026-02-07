@@ -16,6 +16,7 @@ Runs Lighthouse audits against Vercel preview deployments and posts results as a
   - 🟠 Score >= 50
   - 🔴 Score < 50
 - Reports on Performance, Accessibility, Best Practices, and SEO
+- Shows detailed diagnostics for any score below 85%
 
 ## Usage
 
@@ -33,6 +34,10 @@ jobs:
   lighthouse:
     if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview'
     uses: queso/gh-workflows/.github/workflows/lighthouse.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      deployments: read
     with:
       target_url: ${{ github.event.deployment_status.target_url }}
       deployment_id: ${{ github.event.deployment.id }}
@@ -40,12 +45,13 @@ jobs:
 
 ### Required Permissions
 
-The calling workflow needs these permissions for the reusable workflow to post PR comments:
+The calling workflow needs these permissions for the reusable workflow to function:
 
 ```yaml
 permissions:
-  contents: read
-  pull-requests: write
+  contents: read        # Checkout the repo
+  pull-requests: write  # Post comments to PR
+  deployments: read     # Look up deployment to find associated PR
 ```
 
 ## License
