@@ -35,7 +35,19 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const results = JSON.parse(fs.readFileSync('.lighthouseci/lhr-0.json', 'utf8'));
+            const path = require('path');
+
+            // Find the Lighthouse results file
+            const lhciDir = '.lighthouseci';
+            const files = fs.readdirSync(lhciDir);
+            const lhrFile = files.find(f => f.startsWith('lhr-') && f.endsWith('.json'));
+
+            if (!lhrFile) {
+              core.setFailed('Could not find Lighthouse results file');
+              return;
+            }
+
+            const results = JSON.parse(fs.readFileSync(path.join(lhciDir, lhrFile), 'utf8'));
             const categories = results.categories;
 
             const score = (val) => Math.round(val * 100);
