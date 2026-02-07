@@ -82,14 +82,38 @@ jobs:
               deployment_id: ${{ inputs.deployment_id }}
             });
             const ref = deployment.data.ref;
+            const sha = deployment.data.sha;
+
+            console.log(`Deployment ref: ${ref}`);
+            console.log(`Deployment sha: ${sha}`);
+
+            // Try finding PR by commit SHA first (more reliable)
+            const prsForCommit = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha
+            });
+
+            if (prsForCommit.data.length > 0) {
+              const pr = prsForCommit.data.find(p => p.state === 'open') || prsForCommit.data[0];
+              console.log(`Found PR #${pr.number} via commit SHA`);
+              core.setOutput('number', pr.number);
+              return;
+            }
+
+            // Fallback: try by branch name
             const prs = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
               head: `${context.repo.owner}:${ref}`,
               state: 'open'
             });
+
             if (prs.data.length > 0) {
+              console.log(`Found PR #${prs.data[0].number} via branch name`);
               core.setOutput('number', prs.data[0].number);
+            } else {
+              console.log('No PR found for this deployment');
             }
 
       - name: Post Comment
