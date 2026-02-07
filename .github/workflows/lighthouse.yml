@@ -1,0 +1,87 @@
+name: Lighthouse CI
+
+on:
+  workflow_call:
+    inputs:
+      target_url:
+        description: 'The URL to run Lighthouse against'
+        required: true
+        type: string
+      deployment_id:
+        description: 'The deployment ID to find the associated PR'
+        required: true
+        type: number
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Lighthouse
+        id: lighthouse
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: ${{ inputs.target_url }}
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Format Lighthouse Score
+        id: format
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('.lighthouseci/lhr-0.json', 'utf8'));
+            const categories = results.categories;
+
+            const score = (val) => Math.round(val * 100);
+            const emoji = (val) => val >= 0.9 ? '🟢' : val >= 0.5 ? '🟠' : '🔴';
+
+            const comment = [
+              '## ⚡ Lighthouse Report',
+              '',
+              '| Category | Score |',
+              '|----------|-------|',
+              `| ${emoji(categories.performance.score)} Performance | ${score(categories.performance.score)} |`,
+              `| ${emoji(categories.accessibility.score)} Accessibility | ${score(categories.accessibility.score)} |`,
+              `| ${emoji(categories['best-practices'].score)} Best Practices | ${score(categories['best-practices'].score)} |`,
+              `| ${emoji(categories.seo.score)} SEO | ${score(categories.seo.score)} |`,
+              '',
+              `🔗 [Preview](${process.env.DEPLOY_URL})`
+            ].join('\n');
+
+            core.setOutput('comment', comment);
+        env:
+          DEPLOY_URL: ${{ inputs.target_url }}
+
+      - name: Find PR Number
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.getDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ inputs.deployment_id }}
+            });
+            const ref = deployment.data.ref;
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${ref}`,
+              state: 'open'
+            });
+            if (prs.data.length > 0) {
+              core.setOutput('number', prs.data[0].number);
+            }
+
+      - name: Post Comment
+        if: steps.pr.outputs.number
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ steps.pr.outputs.number }}
+          body: ${{ steps.format.outputs.comment }}
