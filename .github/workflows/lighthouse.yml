@@ -49,12 +49,13 @@ jobs:
             }
 
             const results = JSON.parse(fs.readFileSync(path.join(lhciDir, lhrFile), 'utf8'));
-            const categories = results.categories;
+            const { categories, audits } = results;
 
             const score = (val) => Math.round(val * 100);
             const emoji = (val) => val >= 0.9 ? '🟢' : val >= 0.5 ? '🟠' : '🔴';
+            const THRESHOLD = 0.85;
 
-            const comment = [
+            const lines = [
               '## ⚡ Lighthouse Report',
               '',
               '| Category | Score |',
@@ -63,11 +64,87 @@ jobs:
               `| ${emoji(categories.accessibility.score)} Accessibility | ${score(categories.accessibility.score)} |`,
               `| ${emoji(categories['best-practices'].score)} Best Practices | ${score(categories['best-practices'].score)} |`,
               `| ${emoji(categories.seo.score)} SEO | ${score(categories.seo.score)} |`,
-              '',
-              `🔗 [Preview](${process.env.DEPLOY_URL})`
-            ].join('\n');
+            ];
 
-            core.setOutput('comment', comment);
+            // Add diagnostics for categories below threshold
+            const diagnostics = [];
+
+            // Performance diagnostics
+            if (categories.performance.score < THRESHOLD) {
+              const perfDiag = ['', '### Performance'];
+
+              // Key metrics
+              const metrics = [
+                ['First Contentful Paint', audits['first-contentful-paint']?.displayValue],
+                ['Largest Contentful Paint', audits['largest-contentful-paint']?.displayValue],
+                ['Total Blocking Time', audits['total-blocking-time']?.displayValue],
+                ['Cumulative Layout Shift', audits['cumulative-layout-shift']?.displayValue],
+              ].filter(([_, v]) => v);
+
+              if (metrics.length) {
+                perfDiag.push('**Metrics:** ' + metrics.map(([k, v]) => `${k}: ${v}`).join(' · '));
+              }
+
+              // Top opportunities
+              const opportunities = Object.values(audits)
+                .filter(a => a.details?.overallSavingsMs > 100)
+                .sort((a, b) => b.details.overallSavingsMs - a.details.overallSavingsMs)
+                .slice(0, 3)
+                .map(a => `- ${a.title} (${Math.round(a.details.overallSavingsMs)}ms)`);
+
+              if (opportunities.length) {
+                perfDiag.push('', '**Opportunities:**', ...opportunities);
+              }
+
+              diagnostics.push(...perfDiag);
+            }
+
+            // Accessibility diagnostics
+            if (categories.accessibility.score < THRESHOLD) {
+              const a11yIssues = Object.values(audits)
+                .filter(a => a.scoreDisplayMode === 'binary' && a.score === 0 &&
+                  categories.accessibility.auditRefs?.some(r => r.id === a.id))
+                .slice(0, 5)
+                .map(a => `- ${a.title}`);
+
+              if (a11yIssues.length) {
+                diagnostics.push('', '### Accessibility', ...a11yIssues);
+              }
+            }
+
+            // Best Practices diagnostics
+            if (categories['best-practices'].score < THRESHOLD) {
+              const bpIssues = Object.values(audits)
+                .filter(a => a.scoreDisplayMode === 'binary' && a.score === 0 &&
+                  categories['best-practices'].auditRefs?.some(r => r.id === a.id))
+                .slice(0, 5)
+                .map(a => `- ${a.title}`);
+
+              if (bpIssues.length) {
+                diagnostics.push('', '### Best Practices', ...bpIssues);
+              }
+            }
+
+            // SEO diagnostics
+            if (categories.seo.score < THRESHOLD) {
+              const seoIssues = Object.values(audits)
+                .filter(a => a.scoreDisplayMode === 'binary' && a.score === 0 &&
+                  categories.seo.auditRefs?.some(r => r.id === a.id))
+                .slice(0, 5)
+                .map(a => `- ${a.title}`);
+
+              if (seoIssues.length) {
+                diagnostics.push('', '### SEO', ...seoIssues);
+              }
+            }
+
+            if (diagnostics.length) {
+              lines.push('', '<details>', '<summary>Issues to address</summary>', ...diagnostics, '', '</details>');
+            }
+
+            lines.push('', `🔗 [Preview](${process.env.DEPLOY_URL})`);
+
+            core.setOutput('comment', lines.join('\n'));
         env:
           DEPLOY_URL: ${{ inputs.target_url }}
 
