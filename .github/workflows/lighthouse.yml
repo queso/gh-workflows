@@ -178,7 +178,7 @@ jobs:
               return;
             }
 
-            // Fallback: try by branch name
+            // Fallback 1: try by branch name (ref may be branch or SHA)
             const prs = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -189,9 +189,32 @@ jobs:
             if (prs.data.length > 0) {
               console.log(`Found PR #${prs.data[0].number} via branch name`);
               core.setOutput('number', prs.data[0].number);
-            } else {
-              console.log('No PR found for this deployment');
+              return;
             }
+
+            // Fallback 2: resolve branches containing this SHA, then find PR
+            // Vercel sets deployment ref to commit SHA, not branch name
+            const branches = await github.rest.repos.listBranchesForHeadCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha
+            });
+
+            for (const branch of branches.data) {
+              const branchPrs = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: `${context.repo.owner}:${branch.name}`,
+                state: 'open'
+              });
+              if (branchPrs.data.length > 0) {
+                console.log(`Found PR #${branchPrs.data[0].number} via branch ${branch.name}`);
+                core.setOutput('number', branchPrs.data[0].number);
+                return;
+              }
+            }
+
+            console.log('No PR found for this deployment');
 
       - name: Post Comment
         if: steps.pr.outputs.number
