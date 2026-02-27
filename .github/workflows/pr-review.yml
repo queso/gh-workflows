@@ -1,0 +1,116 @@
+name: AI PR Review
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: 'LiteLLM model identifier (e.g. fireworks_ai/accounts/fireworks/models/deepseek-v3)'
+        required: false
+        type: string
+        default: 'fireworks_ai/accounts/fireworks/models/deepseek-v3'
+      fallback_model:
+        description: 'Fallback model if primary fails'
+        required: false
+        type: string
+        default: 'fireworks_ai/accounts/fireworks/models/llama-v3p1-70b-instruct'
+      context_file:
+        description: 'Path to project context file (e.g. CLAUDE.md, AGENTS.md)'
+        required: false
+        type: string
+        default: 'CLAUDE.md'
+      extra_instructions:
+        description: 'Additional review instructions appended after context file'
+        required: false
+        type: string
+        default: ''
+      auto_review:
+        description: 'Run /review automatically'
+        required: false
+        type: boolean
+        default: true
+      auto_describe:
+        description: 'Run /describe automatically'
+        required: false
+        type: boolean
+        default: true
+      auto_improve:
+        description: 'Run /improve automatically'
+        required: false
+        type: boolean
+        default: true
+      commitable_suggestions:
+        description: 'Post code suggestions as committable inline comments'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      llm_api_key:
+        description: 'API key for the LLM provider (e.g. FIREWORKS_AI_API_KEY, ANTHROPIC_KEY)'
+        required: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load project context
+        id: context
+        run: |
+          CONTEXT=""
+
+          # Load primary context file
+          if [ -f "${{ inputs.context_file }}" ]; then
+            echo "Found ${{ inputs.context_file }}"
+            CONTEXT=$(cat "${{ inputs.context_file }}")
+          fi
+
+          # Append any AGENTS.md files (up to 3 levels deep)
+          for f in $(find . -maxdepth 3 -name "AGENTS.md" 2>/dev/null); do
+            echo "Found $f"
+            CONTEXT="$CONTEXT"$'\n\n'"--- From $f ---"$'\n'"$(cat "$f")"
+          done
+
+          # Append extra instructions
+          if [ -n "${{ inputs.extra_instructions }}" ]; then
+            CONTEXT="$CONTEXT"$'\n\n'"${{ inputs.extra_instructions }}"
+          fi
+
+          if [ -z "$CONTEXT" ]; then
+            echo "No context files found, running without project context"
+            CONTEXT="No project-specific context provided."
+          fi
+
+          # Write to file to avoid env var escaping issues
+          echo "$CONTEXT" > /tmp/pr_context.txt
+          echo "has_context=true" >> $GITHUB_OUTPUT
+
+      - name: Build extra instructions
+        id: instructions
+        run: |
+          INSTRUCTIONS="Use the following project conventions and context when reviewing this PR:"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n\n'"$(cat /tmp/pr_context.txt)"
+
+          # Use delimiter for multiline env var
+          echo "REVIEW_INSTRUCTIONS<<DELIM" >> $GITHUB_ENV
+          echo "$INSTRUCTIONS" >> $GITHUB_ENV
+          echo "DELIM" >> $GITHUB_ENV
+
+      - name: Run PR Agent
+        uses: Codium-ai/pr-agent@main
+        env:
+          FIREWORKS_AI_API_KEY: ${{ secrets.llm_api_key }}
+          ANTHROPIC.KEY: ${{ secrets.llm_api_key }}
+          OPENAI_KEY: ${{ secrets.llm_api_key }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          config.model: ${{ inputs.model }}
+          config.fallback_models: '["${{ inputs.fallback_model }}"]'
+          github_action_config.auto_review: ${{ inputs.auto_review }}
+          github_action_config.auto_describe: ${{ inputs.auto_describe }}
+          github_action_config.auto_improve: ${{ inputs.auto_improve }}
+          pr_reviewer.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
+          pr_code_suggestions.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
+          pr_code_suggestions.commitable_code_suggestions: ${{ inputs.commitable_suggestions }}
