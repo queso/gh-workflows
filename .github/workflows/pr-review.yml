@@ -102,9 +102,11 @@ jobs:
       - name: Run PR Agent
         uses: Codium-ai/pr-agent@main
         env:
+          # Set all provider keys — only the one matching the model is used.
+          # OPENAI_KEY must be set (even as dummy) or PR-Agent may fail to start.
+          OPENAI_KEY: ${{ secrets.llm_api_key }}
           FIREWORKS_AI_API_KEY: ${{ secrets.llm_api_key }}
           ANTHROPIC.KEY: ${{ secrets.llm_api_key }}
-          OPENAI_KEY: ${{ secrets.llm_api_key }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           config.model: ${{ inputs.model }}
           config.fallback_models: '["${{ inputs.fallback_model }}"]'
