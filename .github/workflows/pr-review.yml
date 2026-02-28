@@ -113,6 +113,7 @@ jobs:
           github_action_config.auto_review: ${{ inputs.auto_review }}
           github_action_config.auto_describe: ${{ inputs.auto_describe }}
           github_action_config.auto_improve: ${{ inputs.auto_improve }}
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
           pr_reviewer.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
           pr_code_suggestions.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
           pr_code_suggestions.commitable_code_suggestions: ${{ inputs.commitable_suggestions }}
