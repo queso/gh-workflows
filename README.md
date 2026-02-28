@@ -91,8 +91,8 @@ jobs:
 
 | Input | Default | Description |
 |-------|---------|-------------|
-| `model` | `fireworks_ai/.../deepseek-v3` | LiteLLM model identifier |
-| `fallback_model` | `fireworks_ai/.../llama-v3p1-70b-instruct` | Fallback if primary fails |
+| `model` | `fireworks_ai/.../deepseek-v3p2` | LiteLLM model identifier |
+| `fallback_model` | `fireworks_ai/.../deepseek-v3p1` | Fallback if primary fails |
 | `context_file` | `CLAUDE.md` | Project context file path |
 | `extra_instructions` | `''` | Additional review instructions |
 | `auto_review` | `true` | Run /review on PR open |

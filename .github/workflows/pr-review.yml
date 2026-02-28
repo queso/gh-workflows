@@ -4,15 +4,15 @@ on:
   workflow_call:
     inputs:
       model:
-        description: 'LiteLLM model identifier (e.g. fireworks_ai/accounts/fireworks/models/deepseek-v3)'
+        description: 'LiteLLM model identifier (e.g. fireworks_ai/accounts/fireworks/models/deepseek-v3p2)'
         required: false
         type: string
-        default: 'fireworks_ai/accounts/fireworks/models/deepseek-v3'
+        default: 'fireworks_ai/accounts/fireworks/models/deepseek-v3p2'
       fallback_model:
         description: 'Fallback model if primary fails'
         required: false
         type: string
-        default: 'fireworks_ai/accounts/fireworks/models/llama-v3p1-70b-instruct'
+        default: 'fireworks_ai/accounts/fireworks/models/deepseek-v3p1'
       context_file:
         description: 'Path to project context file (e.g. CLAUDE.md, AGENTS.md)'
         required: false
