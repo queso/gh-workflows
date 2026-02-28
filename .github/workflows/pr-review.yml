@@ -4,15 +4,15 @@ on:
   workflow_call:
     inputs:
       model:
-        description: 'LiteLLM model identifier (e.g. fireworks_ai/accounts/fireworks/models/deepseek-v3p2)'
+        description: 'LiteLLM model identifier (e.g. fireworks_ai/accounts/fireworks/models/kimi-k2-instruct-0905)'
         required: false
         type: string
-        default: 'fireworks_ai/accounts/fireworks/models/deepseek-v3p2'
+        default: 'fireworks_ai/accounts/fireworks/models/kimi-k2-instruct-0905'
       fallback_model:
         description: 'Fallback model if primary fails'
         required: false
         type: string
-        default: 'fireworks_ai/accounts/fireworks/models/deepseek-v3p1'
+        default: 'fireworks_ai/accounts/fireworks/models/deepseek-v3p2'
       context_file:
         description: 'Path to project context file (e.g. CLAUDE.md, AGENTS.md)'
         required: false
@@ -110,7 +110,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           config.model: ${{ inputs.model }}
           config.fallback_models: '["${{ inputs.fallback_model }}"]'
-          config.custom_model_max_tokens: 128000
+          config.custom_model_max_tokens: 262144
           github_action_config.auto_review: ${{ inputs.auto_review }}
           github_action_config.auto_describe: ${{ inputs.auto_describe }}
           github_action_config.auto_improve: ${{ inputs.auto_improve }}
