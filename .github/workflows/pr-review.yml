@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       model:
-        description: 'LiteLLM model identifier (e.g. fireworks_ai/accounts/fireworks/models/kimi-k2-instruct-0905)'
+        description: 'LiteLLM model identifier (e.g. fireworks_ai/accounts/fireworks/models/kimi-k2p5)'
         required: false
         type: string
-        default: 'fireworks_ai/accounts/fireworks/models/kimi-k2-instruct-0905'
+        default: 'fireworks_ai/accounts/fireworks/models/kimi-k2p5'
       fallback_model:
         description: 'Fallback model if primary fails'
         required: false
