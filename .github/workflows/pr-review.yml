@@ -110,7 +110,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           config.model: ${{ inputs.model }}
           config.fallback_models: '["${{ inputs.fallback_model }}"]'
-          config.max_model_tokens: 128000
+          config.custom_model_max_tokens: 128000
           github_action_config.auto_review: ${{ inputs.auto_review }}
           github_action_config.auto_describe: ${{ inputs.auto_describe }}
           github_action_config.auto_improve: ${{ inputs.auto_improve }}
