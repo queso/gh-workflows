@@ -100,7 +100,7 @@ jobs:
           echo "DELIM" >> $GITHUB_ENV
 
       - name: Run PR Agent
-        uses: Codium-ai/pr-agent@main
+        uses: Codium-ai/pr-agent@v0.32
         env:
           # Set all provider keys — only the one matching the model is used.
           # OPENAI_KEY must be set (even as dummy) or PR-Agent may fail to start.
@@ -110,6 +110,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           config.model: ${{ inputs.model }}
           config.fallback_models: '["${{ inputs.fallback_model }}"]'
+          config.max_model_tokens: 128000
           github_action_config.auto_review: ${{ inputs.auto_review }}
           github_action_config.auto_describe: ${{ inputs.auto_describe }}
           github_action_config.auto_improve: ${{ inputs.auto_improve }}
@@ -117,3 +118,4 @@ jobs:
           pr_reviewer.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
           pr_code_suggestions.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
           pr_code_suggestions.commitable_code_suggestions: ${{ inputs.commitable_suggestions }}
+          pr_description.enable_large_pr_handling: true
