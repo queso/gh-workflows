@@ -118,4 +118,6 @@ jobs:
           pr_reviewer.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
           pr_code_suggestions.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
           pr_code_suggestions.commitable_code_suggestions: ${{ inputs.commitable_suggestions }}
+          pr_reviewer.persistent_comment: true
+          pr_code_suggestions.persistent_comment: true
           pr_description.enable_large_pr_handling: true
