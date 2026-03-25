@@ -100,7 +100,7 @@ jobs:
           echo "DELIM" >> $GITHUB_ENV
 
       - name: Run PR Agent
-        uses: Codium-ai/pr-agent@v0.32
+        uses: qodo-ai/pr-agent@v0.32
         env:
           # Set all provider keys — only the one matching the model is used.
           # OPENAI_KEY must be set (even as dummy) or PR-Agent may fail to start.
