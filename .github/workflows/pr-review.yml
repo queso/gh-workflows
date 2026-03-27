@@ -23,6 +23,16 @@ on:
         required: false
         type: string
         default: ''
+      suggestions_score_threshold:
+        description: 'Minimum confidence score (1-10) for suggestions to be posted'
+        required: false
+        type: number
+        default: 7
+      num_code_suggestions:
+        description: 'Maximum number of code suggestions to post'
+        required: false
+        type: number
+        default: 3
       auto_review:
         description: 'Run /review automatically'
         required: false
@@ -94,6 +104,21 @@ jobs:
           INSTRUCTIONS="Use the following project conventions and context when reviewing this PR:"
           INSTRUCTIONS="$INSTRUCTIONS"$'\n\n'"$(cat /tmp/pr_context.txt)"
 
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n\n'"FLAG THESE (high-value catches where AI review adds real value):"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- Null/undefined dereferences, off-by-one errors, and incorrect boundary conditions"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- Race conditions, deadlocks, and unsafe concurrent access"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- Security issues: injection, auth bypass, secrets in code, path traversal"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- Resource leaks: unclosed handles, missing cleanup, unbounded growth"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- Logic errors: inverted conditions, wrong operator, swapped arguments"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- API contract violations: wrong types, missing required fields, breaking changes"
+
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n\n'"DO NOT COMMENT ON (these generate noise, not value):"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- Code style, formatting, or naming conventions"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- Import ordering or organization"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- 'Consider using X instead of Y' style suggestions"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- Missing comments or documentation"
+          INSTRUCTIONS="$INSTRUCTIONS"$'\n'"- 'You might want to add tests for this' comments"
+
           # Use delimiter for multiline env var
           echo "REVIEW_INSTRUCTIONS<<DELIM" >> $GITHUB_ENV
           echo "$INSTRUCTIONS" >> $GITHUB_ENV
@@ -114,10 +139,17 @@ jobs:
           github_action_config.auto_review: ${{ inputs.auto_review }}
           github_action_config.auto_describe: ${{ inputs.auto_describe }}
           github_action_config.auto_improve: ${{ inputs.auto_improve }}
-          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
+          config.temperature: 0.05
           pr_reviewer.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
+          pr_reviewer.require_tests_review: false
+          pr_reviewer.enable_help_text: false
+          pr_reviewer.persistent_comment: true
           pr_code_suggestions.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
           pr_code_suggestions.commitable_code_suggestions: ${{ inputs.commitable_suggestions }}
-          pr_reviewer.persistent_comment: true
+          pr_code_suggestions.suggestions_score_threshold: ${{ inputs.suggestions_score_threshold }}
+          pr_code_suggestions.num_code_suggestions: ${{ inputs.num_code_suggestions }}
+          pr_code_suggestions.focus_only_on_problems: true
           pr_code_suggestions.persistent_comment: true
+          pr_code_suggestions.enable_help_text: false
           pr_description.enable_large_pr_handling: true
