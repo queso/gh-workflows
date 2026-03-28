@@ -138,8 +138,8 @@ jobs:
           # nested-key separator that Dynaconf documents.
           config__model: ${{ inputs.model }}
           config__fallback_models: '["${{ inputs.fallback_model }}"]'
-          config__custom_model_max_tokens: 262144
-          config__max_model_tokens: 128000
+          config__custom_model_max_tokens: 1000000
+          config__max_model_tokens: 500000
           config__temperature: 0.05
           github_action_config__auto_review: ${{ inputs.auto_review }}
           github_action_config__auto_describe: ${{ inputs.auto_describe }}
