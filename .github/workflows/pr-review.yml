@@ -124,29 +124,6 @@ jobs:
           echo "$INSTRUCTIONS" >> $GITHUB_ENV
           echo "DELIM" >> $GITHUB_ENV
 
-      - name: Generate PR Agent config
-        run: |
-          printf '%s\n' \
-            '[config]' \
-            'temperature = 0.05' \
-            '' \
-            '[pr_reviewer]' \
-            'require_tests_review = false' \
-            'enable_help_text = false' \
-            'persistent_comment = true' \
-            '' \
-            '[pr_code_suggestions]' \
-            'commitable_code_suggestions = ${{ inputs.commitable_suggestions }}' \
-            'suggestions_score_threshold = ${{ inputs.suggestions_score_threshold }}' \
-            'num_code_suggestions = ${{ inputs.num_code_suggestions }}' \
-            'focus_only_on_problems = true' \
-            'persistent_comment = true' \
-            'enable_help_text = false' \
-            '' \
-            '[pr_description]' \
-            'enable_large_pr_handling = true' \
-            > .pr_agent.toml
-
       - name: Run PR Agent
         uses: qodo-ai/pr-agent@v0.32
         env:
@@ -156,12 +133,26 @@ jobs:
           FIREWORKS_AI_API_KEY: ${{ secrets.llm_api_key }}
           ANTHROPIC.KEY: ${{ secrets.llm_api_key }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          config.model: ${{ inputs.model }}
-          config.fallback_models: '["${{ inputs.fallback_model }}"]'
-          config.custom_model_max_tokens: 262144
-          github_action_config.auto_review: ${{ inputs.auto_review }}
-          github_action_config.auto_describe: ${{ inputs.auto_describe }}
-          github_action_config.auto_improve: ${{ inputs.auto_improve }}
-          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
-          pr_reviewer.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
-          pr_code_suggestions.extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
+          # Note: PR-Agent uses Dynaconf. Dots in env var names can be
+          # dropped by Docker; double-underscore (__) is the reliable
+          # nested-key separator that Dynaconf documents.
+          config__model: ${{ inputs.model }}
+          config__fallback_models: '["${{ inputs.fallback_model }}"]'
+          config__custom_model_max_tokens: 262144
+          config__temperature: 0.05
+          github_action_config__auto_review: ${{ inputs.auto_review }}
+          github_action_config__auto_describe: ${{ inputs.auto_describe }}
+          github_action_config__auto_improve: ${{ inputs.auto_improve }}
+          github_action_config__pr_actions: '["opened", "reopened", "ready_for_review"]'
+          pr_reviewer__extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
+          pr_reviewer__require_tests_review: false
+          pr_reviewer__enable_help_text: false
+          pr_reviewer__persistent_comment: true
+          pr_code_suggestions__extra_instructions: ${{ env.REVIEW_INSTRUCTIONS }}
+          pr_code_suggestions__commitable_code_suggestions: ${{ inputs.commitable_suggestions }}
+          pr_code_suggestions__suggestions_score_threshold: ${{ inputs.suggestions_score_threshold }}
+          pr_code_suggestions__num_code_suggestions: ${{ inputs.num_code_suggestions }}
+          pr_code_suggestions__focus_only_on_problems: true
+          pr_code_suggestions__persistent_comment: true
+          pr_code_suggestions__enable_help_text: false
+          pr_description__enable_large_pr_handling: true
