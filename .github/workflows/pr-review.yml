@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       model:
-        description: 'LiteLLM model identifier (e.g. fireworks_ai/accounts/fireworks/models/minimax-m2p5)'
+        description: 'Override model selection (default: auto-selects by PR size — MiniMax M2.5 < 150k tokens, Kimi K2.5 < 220k, Llama 4 Maverick for larger)'
         required: false
         type: string
-        default: 'fireworks_ai/accounts/fireworks/models/minimax-m2p5'
+        default: ''
       fallback_model:
         description: 'Fallback model if primary fails'
         required: false
@@ -124,6 +124,44 @@ jobs:
           echo "$INSTRUCTIONS" >> $GITHUB_ENV
           echo "DELIM" >> $GITHUB_ENV
 
+      - name: Select model based on PR diff size
+        id: model
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Allow callers to override model selection
+          if [ -n "${{ inputs.model }}" ]; then
+            echo "model=${{ inputs.model }}" >> $GITHUB_OUTPUT
+            echo "max_tokens=196608" >> $GITHUB_OUTPUT
+            echo "Using caller-specified model: ${{ inputs.model }}"
+            exit 0
+          fi
+
+          # Estimate token count from the PR diff (~4 chars per token)
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          DIFF_SIZE=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" \
+            -H "Accept: application/vnd.github.diff" 2>/dev/null | wc -c)
+          EST_TOKENS=$((DIFF_SIZE / 4))
+          echo "Diff size: ${DIFF_SIZE} bytes, estimated tokens: ${EST_TOKENS}"
+
+          # Route to the best model that can handle this diff size:
+          #   < 150k tokens → MiniMax M2.5 (196k limit, best review quality)
+          #   < 220k tokens → Kimi K2.5 (262k limit, good quality)
+          #   > 220k tokens → Llama 4 Maverick (1M limit, handles anything)
+          if [ "$EST_TOKENS" -lt 150000 ]; then
+            echo "model=fireworks_ai/accounts/fireworks/models/minimax-m2p5" >> $GITHUB_OUTPUT
+            echo "max_tokens=196608" >> $GITHUB_OUTPUT
+            echo "Selected: MiniMax M2.5 (small PR)"
+          elif [ "$EST_TOKENS" -lt 220000 ]; then
+            echo "model=fireworks_ai/accounts/fireworks/models/kimi-k2p5" >> $GITHUB_OUTPUT
+            echo "max_tokens=262144" >> $GITHUB_OUTPUT
+            echo "Selected: Kimi K2.5 (medium PR)"
+          else
+            echo "model=fireworks_ai/accounts/fireworks/models/llama4-maverick-instruct-basic" >> $GITHUB_OUTPUT
+            echo "max_tokens=1000000" >> $GITHUB_OUTPUT
+            echo "Selected: Llama 4 Maverick (large PR)"
+          fi
+
       - name: Run PR Agent
         uses: qodo-ai/pr-agent@v0.32
         env:
@@ -136,10 +174,10 @@ jobs:
           # Note: PR-Agent uses Dynaconf. Dots in env var names can be
           # dropped by Docker; double-underscore (__) is the reliable
           # nested-key separator that Dynaconf documents.
-          config__model: ${{ inputs.model }}
+          config__model: ${{ steps.model.outputs.model }}
           config__fallback_models: '["${{ inputs.fallback_model }}"]'
-          config__custom_model_max_tokens: 196608
-          config__max_model_tokens: 196608
+          config__custom_model_max_tokens: ${{ steps.model.outputs.max_tokens }}
+          config__max_model_tokens: ${{ steps.model.outputs.max_tokens }}
           config__ai_timeout: 300
           config__temperature: 0.05
           github_action_config__auto_review: ${{ inputs.auto_review }}
