@@ -12,7 +12,7 @@ AI-powered code review using [PR-Agent](https://github.com/qodo-ai/pr-agent) wit
 - Automatic PR description, code review, and improvement suggestions
 - Loads `CLAUDE.md` and `AGENTS.md` as review context automatically
 - Committable inline suggestions (one-click accept on GitHub)
-- Configurable model — defaults to DeepSeek V3 on Fireworks (~$0.02/PR)
+- Auto-selects the best model by PR size (Qwen3 Coder → Kimi K2.6 → DeepSeek V4 Pro)
 - Works with any LiteLLM-supported provider (Fireworks, Anthropic, OpenAI, etc.)
 
 ### Lighthouse CI
@@ -91,8 +91,8 @@ jobs:
 
 | Input | Default | Description |
 |-------|---------|-------------|
-| `model` | `fireworks_ai/.../deepseek-v3p2` | LiteLLM model identifier |
-| `fallback_model` | `fireworks_ai/.../deepseek-v3p1` | Fallback if primary fails |
+| `model` | Auto-select by PR size | LiteLLM model identifier (overrides auto-select) |
+| `fallback_model` | `fireworks_ai/.../kimi-k2p6` | Fallback if primary fails |
 | `context_file` | `CLAUDE.md` | Project context file path |
 | `extra_instructions` | `''` | Additional review instructions |
 | `auto_review` | `true` | Run /review on PR open |

@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       model:
-        description: 'Override model selection (default: auto-selects by PR size — MiniMax M2.5 < 150k tokens, Kimi K2.5 < 220k, Llama 4 Maverick for larger)'
+        description: 'Override model selection (default: auto-selects by PR size — Qwen3 Coder < 150k tokens, Kimi K2.6 < 220k, DeepSeek V4 Pro for larger)'
         required: false
         type: string
         default: ''
@@ -12,7 +12,7 @@ on:
         description: 'Fallback model if primary fails'
         required: false
         type: string
-        default: 'fireworks_ai/accounts/fireworks/models/kimi-k2p5'
+        default: 'fireworks_ai/accounts/fireworks/models/kimi-k2p6'
       context_file:
         description: 'Path to project context file (e.g. CLAUDE.md, AGENTS.md)'
         required: false
@@ -145,21 +145,21 @@ jobs:
           echo "Diff size: ${DIFF_SIZE} bytes, estimated tokens: ${EST_TOKENS}"
 
           # Route to the best model that can handle this diff size:
-          #   < 150k tokens → MiniMax M2.5 (196k limit, best review quality)
-          #   < 220k tokens → Kimi K2.5 (262k limit, good quality)
-          #   > 220k tokens → Llama 4 Maverick (1M limit, handles anything)
+          #   < 150k tokens → Qwen3 Coder (262k limit, cheapest, code-specialized)
+          #   < 220k tokens → Kimi K2.6 (262k limit, strong agentic coding)
+          #   > 220k tokens → DeepSeek V4 Pro (1M limit, best code review quality)
           if [ "$EST_TOKENS" -lt 150000 ]; then
-            echo "model=fireworks_ai/accounts/fireworks/models/minimax-m2p5" >> $GITHUB_OUTPUT
-            echo "max_tokens=196608" >> $GITHUB_OUTPUT
-            echo "Selected: MiniMax M2.5 (small PR)"
-          elif [ "$EST_TOKENS" -lt 220000 ]; then
-            echo "model=fireworks_ai/accounts/fireworks/models/kimi-k2p5" >> $GITHUB_OUTPUT
+            echo "model=fireworks_ai/accounts/fireworks/models/qwen3-coder-480b-a35b-instruct" >> $GITHUB_OUTPUT
             echo "max_tokens=262144" >> $GITHUB_OUTPUT
-            echo "Selected: Kimi K2.5 (medium PR)"
+            echo "Selected: Qwen3 Coder (small PR)"
+          elif [ "$EST_TOKENS" -lt 220000 ]; then
+            echo "model=fireworks_ai/accounts/fireworks/models/kimi-k2p6" >> $GITHUB_OUTPUT
+            echo "max_tokens=262144" >> $GITHUB_OUTPUT
+            echo "Selected: Kimi K2.6 (medium PR)"
           else
-            echo "model=fireworks_ai/accounts/fireworks/models/llama4-maverick-instruct-basic" >> $GITHUB_OUTPUT
-            echo "max_tokens=1000000" >> $GITHUB_OUTPUT
-            echo "Selected: Llama 4 Maverick (large PR)"
+            echo "model=fireworks_ai/accounts/fireworks/models/deepseek-v4-pro" >> $GITHUB_OUTPUT
+            echo "max_tokens=1040000" >> $GITHUB_OUTPUT
+            echo "Selected: DeepSeek V4 Pro (large PR)"
           fi
 
       - name: Run PR Agent
