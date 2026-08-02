@@ -183,7 +183,9 @@ jobs:
         env:
           FLOW_IMAGE: ${{ inputs.flow_image }}
         run: |
-          mkdir -p .spider-out
+          # World-writable scratch dir: the image runs as its non-root `conduit` user, whose uid
+          # does not match the runner's, so a plain bind-mounted dir is EACCES on first write.
+          mkdir -p .spider-out && chmod 777 .spider-out
           # --entrypoint bun is REQUIRED: the engine image's ENTRYPOINT is ["bun","src/cli/main.ts"],
           # so a bare trailing command APPENDS to it instead of replacing it, and the workdir
           # override then breaks the entrypoint's relative path ("Module not found src/cli/main.ts").
