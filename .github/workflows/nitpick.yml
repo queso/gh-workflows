@@ -168,16 +168,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.registry_token || secrets.GITHUB_TOKEN }}
 
-      - name: Spider the checkout (coupling graph for the shard planner)
-        # Deterministic, ~50ms, zero tokens. classify.mjs picks graph.json up by convention;
-        # without it sharding falls back to diff-derived edges (lossier, still coupling-aware).
+      - name: Spider the checkout (coupling graph + related-code pack)
+        # Deterministic, ~50ms, zero tokens. Two outputs, both by convention:
+        #   graph.json  — coupling graph; classify.mjs shards on it. Without it sharding falls
+        #                 back to diff-derived edges (lossier, still coupling-aware).
+        #   related.txt — the reviewers' RELATED CODE section: ~850 tokens of excerpts from
+        #                 UNCHANGED files the diff reaches (a helper it imports, the prisma
+        #                 models it touches, the API spec beside a changed route). Contract-class
+        #                 bugs live in those files, and reviewers otherwise never see them.
+        # This MUST happen here, not in the flow container: the container gets no checkout, only
+        # the files we docker cp in. Fallback on any failure is an empty pack — review still runs,
+        # just without the extra context.
         # Runs after GHCR login so a private FLOW_IMAGE pulls authenticated, not anonymous.
+        env:
+          FLOW_IMAGE: ${{ inputs.flow_image }}
         run: |
           mkdir -p .spider-out
-          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/.spider-out:/out" -w /flow "$FLOW_IMAGE" \
-            bun src/spider.mjs /repo /out/graph.json \
+          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/.spider-out:/out" \
+            -v "$PWD/diff.patch:/tmp/diff.patch:ro" -w /flow "$FLOW_IMAGE" \
+            bun src/spider.mjs /repo /out/graph.json --diff /tmp/diff.patch --pack /out/related.txt \
             && mv .spider-out/graph.json graph.json \
-            || echo "spider unavailable — classify falls back to diff-derived edges"
+            && mv .spider-out/related.txt related.txt \
+            || echo "spider unavailable — classify falls back to diff-derived edges, reviewers to an empty pack"
         continue-on-error: true
 
       - name: Run Nitpick flow
@@ -189,6 +201,10 @@ jobs:
           CONDUIT_API_KEY: ${{ secrets.conduit_api_key }}
         run: |
           set -euo pipefail
+          # The review stations render related.txt unconditionally, so the file must exist even
+          # when the spider step above failed (it is continue-on-error). An empty pack is benign:
+          # the reviewers just get no RELATED CODE section.
+          [ -f related.txt ] || printf '(no related code identified)\n' > related.txt
           # The per-flow image bakes flow.yaml/src/prompts at /flow (CONDUIT_PROJECT_ROOT=/flow).
           # We need the PR diff IN and review.json OUT without shadowing that baked /flow, so we
           # use the create → cp-in → start → cp-out → rm pattern (no project-root bind-mount).
@@ -200,12 +216,12 @@ jobs:
           docker rm "$cid" >/dev/null
           envsubst '$REVIEWER_MODEL $COORDINATOR_MODEL' < flow.baked.yaml > flow.rendered.yaml
 
-          # Whole-run retry: a single stalled gateway call is FATAL to a conduit run today —
-          # the engine retries 429/5xx, but a stall that trips Bun's hard 300s fetch ceiling
-          # propagates as `fatal:`. A discarded run costs only a few cents, so re-running the
+          # Whole-run retry: a single stalled gateway call is FATAL to a conduit run today
+          # (engine limitation). Measured on
+          # a large production PR: a stall costs ~$0.02-0.04 of discarded work, so re-running the
           # whole flow is cheap insurance. Fresh state volume per attempt — re-entering run
-          # `default` on a used volume trips the engine's same-run-id UNIQUE constraint.
-          # Drop this loop once the engine gains retry-on-stall.
+          # `default` on a used volume trips the engine's same-run-id UNIQUE constraint
+          # (an engine issue). Drop this loop when #89 lands retry-on-stall.
           rc=1
           for attempt in 1 2 3; do
             docker volume rm -f conduit_data >/dev/null 2>&1 || true
@@ -223,6 +239,7 @@ jobs:
             # rendered flow.yaml are only ever read, so root-owned 644 copies are fine.)
             docker cp diff.patch  "$cid:/tmp/diff.patch"
             docker cp context.json "$cid:/flow/context.json"
+            docker cp related.txt  "$cid:/flow/related.txt"
             [ -f graph.json ] && docker cp graph.json "$cid:/flow/graph.json" || true
 
             # Run to a terminal lane. A real failure (scrap/hold, doctor preflight) exits
@@ -284,7 +301,7 @@ jobs:
         run: |
           set -euo pipefail
           # post-review.mjs is baked into the image (/flow/post-review.mjs); run it via the
-          # engine's Bun so the workflow needs no checkout of the flow's own source.
+          # engine's Bun so the workflow needs no checkout of nitpick-flow's own source.
           docker run --rm \
             -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e PR_NUMBER -e HEAD_SHA \
             -e REVIEW_FILE=/review.json \
