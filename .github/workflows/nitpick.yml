@@ -184,9 +184,14 @@ jobs:
           FLOW_IMAGE: ${{ inputs.flow_image }}
         run: |
           mkdir -p .spider-out
+          # --entrypoint bun is REQUIRED: the engine image's ENTRYPOINT is ["bun","src/cli/main.ts"],
+          # so a bare trailing command APPENDS to it instead of replacing it, and the workdir
+          # override then breaks the entrypoint's relative path ("Module not found src/cli/main.ts").
+          # Same pattern as the report-*/post-review steps. Latent since the step was written —
+          # only exposed once the FLOW_IMAGE env fix let this docker run execute at all.
           docker run --rm -v "$PWD:/repo:ro" -v "$PWD/.spider-out:/out" \
-            -v "$PWD/diff.patch:/tmp/diff.patch:ro" -w /flow "$FLOW_IMAGE" \
-            bun src/spider.mjs /repo /out/graph.json --diff /tmp/diff.patch --pack /out/related.txt \
+            -v "$PWD/diff.patch:/tmp/diff.patch:ro" --entrypoint bun "$FLOW_IMAGE" \
+            /flow/src/spider.mjs /repo /out/graph.json --diff /tmp/diff.patch --pack /out/related.txt \
             && mv .spider-out/graph.json graph.json \
             && mv .spider-out/related.txt related.txt \
             || echo "spider unavailable — classify falls back to diff-derived edges, reviewers to an empty pack"
