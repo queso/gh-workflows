@@ -42,16 +42,19 @@ on:
       reviewer_model:
         description: "Cheap/code model for the specialist reviewers (gateway routes this string)"
         type: string
-        # deepseek-v4-flash-0731 (Fireworks list price $0.14 in / $0.28 out, 1M ctx) — output at
-        # HALF gpt-oss-120b's price with 8x the context. An earlier build of deepseek-v4-flash
-        # was trialed and reverted (liveness stalls, Bun's hidden 5-min fetch timeout, and
-        # schema-validation scrap exits); this is a different build AND a different result —
-        # an A/B against the flow's eval suite showed identical pass rates on all 9 cases,
-        # including every planted-bug catch and the escape gate, and it honors
-        # `reasoning_effort: low` the same way gpt-oss-120b does. Treat any model swap as a
-        # canary: a green prompt eval says nothing about engine-side stability. XL diffs still
-        # need the shard planner's chunking, not raw context size, for pathological cases.
-        default: "accounts/fireworks/models/deepseek-v4-flash-0731"
+        # gpt-oss-120b: fast + reliable, and it fits its reasoning inside max_tokens on real
+        # review prompts. TWO deepseek-v4-flash trials have now been reverted:
+        #   1. The April build: liveness stalls + Bun's hidden 5-min fetch timeout.
+        #   2. The -0731 build: EVERY reviewer child hit max_tokens exactly (6000/6000) and
+        #      terminated `output-truncated`, scrapping the whole fan-out — on ~23k-token
+        #      production prompts, with `reasoning_effort: low` set and honored. Its reasoning
+        #      simply eats the output budget before any JSON is emitted.
+        # The lesson is about the GATE, not the model: a promptdiff A/B on the eval fixtures
+        # passed 9/9, because those fixtures render ~2-6k-token prompts, where deepseek reasons
+        # briefly and answers cleanly. The failure only exists in the size regime the eval never
+        # exercised. Any future reviewer-model swap must be validated at PRODUCTION prompt size
+        # (~20k+ input), not just on fixture diffs — and treated as a canary on one repo first.
+        default: "accounts/fireworks/models/gpt-oss-120b"
       coordinator_model:
         description: "Frontier model for the coordinator (judgment lives here)"
         type: string
