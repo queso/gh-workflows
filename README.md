@@ -15,6 +15,19 @@ AI-powered code review using [PR-Agent](https://github.com/qodo-ai/pr-agent) wit
 - Auto-selects the best model by PR size (Qwen3 Coder → Kimi K2.6 → DeepSeek V4 Pro)
 - Works with any LiteLLM-supported provider (Fireworks, Anthropic, OpenAI, etc.)
 
+### Nitpick PR Review
+
+Multi-station PR review on the Conduit kernel. Classifies the diff, fans out parallel domain reviewers (security / correctness / performance / conventions / tests) across coupling-aware shards, then a frontier coordinator dedups, assigns severity, and posts **one** batched review with inline anchors.
+
+**Features:**
+- Parallel specialist reviewers instead of one generalist pass — each stays in its lane
+- Shard planner slices large diffs so per-prompt size stays bounded (no diff cap, no coverage hole)
+- Coordinator dedups overlapping findings and gates noise before anything is posted
+- Reads `CLAUDE.md` and `AGENTS.md` for project conventions
+- Post-mortem + model-spend reports written to the job summary on every run
+
+**Requires** access to the private Nitpick flow image — see the access note in the usage section below.
+
 ### Lighthouse CI
 
 Runs Lighthouse audits against Vercel preview deployments and posts results as a PR comment.
@@ -99,6 +112,60 @@ jobs:
 | `auto_describe` | `true` | Run /describe on PR open |
 | `auto_improve` | `true` | Run /improve on PR open |
 | `commitable_suggestions` | `true` | Inline suggestions you can accept with one click |
+
+### Nitpick PR Review
+
+Create `.github/workflows/pr-review.yml` in your repository:
+
+```yaml
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  packages: read
+
+jobs:
+  nitpick:
+    # Fork PRs get no repo secrets — skip them rather than fail a check
+    # the contributor can't fix. Only needed on public repositories.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    uses: queso/gh-workflows/.github/workflows/nitpick.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      packages: read
+    secrets:
+      conduit_api_key: ${{ secrets.FIREWORKS_AI_API_KEY }}
+      # Public repos only — see "Image access" below:
+      # registry_token: ${{ secrets.GHCR_READ_PAT }}
+```
+
+The defaults point at Fireworks serverless for both the reviewers and the coordinator, so that one gateway key is the entire model configuration.
+
+#### Image access
+
+The flow image (`ghcr.io/queso/nitpick-flow`) is a **private** GHCR package, and how you authenticate depends on your repo's visibility:
+
+| Consumer repo | What's required |
+|---|---|
+| **Private** | Grant the repo read access under the package's *Manage Actions access*. `GITHUB_TOKEN` then works — no `registry_token`. |
+| **Public** | The package grant does not apply. Supply `registry_token` — a `read:packages` PAT stored as a repo secret. |
+
+Note that GitHub does not allow a workflow in a public repository to call a reusable workflow stored in a private one. That's why this workflow lives here rather than beside the flow's own source.
+
+#### Inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `flow_image` | `ghcr.io/queso/nitpick-flow:main` | Prebuilt engine + flow image |
+| `reviewer_model` | `accounts/fireworks/models/deepseek-v4-flash-0731` | Cheap/code model for the specialist reviewers |
+| `coordinator_model` | `accounts/fireworks/models/qwen3p7-plus` | Frontier model for the coordinator's judgment |
+| `conduit_base_url` | `https://api.fireworks.ai/inference/v1` | OpenAI-compatible gateway. Front two providers with a litellm proxy and let the model strings route. |
 
 ### Lighthouse CI for Vercel Previews
 
