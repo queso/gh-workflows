@@ -42,8 +42,14 @@ on:
       reviewer_model:
         description: "Cheap/code model for the specialist reviewers (gateway routes this string)"
         type: string
-        # gpt-oss-120b: fast + reliable, and it fits its reasoning inside max_tokens on real
-        # review prompts. TWO deepseek-v4-flash trials have now been reverted:
+        # glm-5p3-flash (since 2026-09-05): validated at PRODUCTION prompt size first — 25/25
+        # clean stops on ~23k-token real-PR fixtures (71–1022 output tokens against the 6000
+        # cap), and it catches findings there that gpt-oss-120b never did (gpt-oss returned
+        # empty findings in 48/50 runs at that size). It fences its JSON (```json … ```) every
+        # call; the engine's coercive parser strips that, so the station contract is unaffected.
+        # Same $0.15/M input as gpt-oss, $0.50/M output.
+        # Predecessor gpt-oss-120b: fast + reliable, but ~zero recall above ~12k tokens.
+        # TWO deepseek-v4-flash trials were reverted before that:
         #   1. The April build: liveness stalls + Bun's hidden 5-min fetch timeout.
         #   2. The -0731 build: EVERY reviewer child hit max_tokens exactly (6000/6000) and
         #      terminated `output-truncated`, scrapping the whole fan-out — on ~23k-token
@@ -54,15 +60,16 @@ on:
         # briefly and answers cleanly. The failure only exists in the size regime the eval never
         # exercised. Any future reviewer-model swap must be validated at PRODUCTION prompt size
         # (~20k+ input), not just on fixture diffs — and treated as a canary on one repo first.
-        default: "accounts/fireworks/models/gpt-oss-120b"
+        default: "accounts/fireworks/models/glm-5p3-flash"
       coordinator_model:
         description: "Frontier model for the coordinator (judgment lives here)"
         type: string
-        # Balanced config: Qwen3.7 Plus ($0.40 in / $1.60 out, 262k context) — stronger judgment
-        # for the gate/merge. Its predecessor qwen3p6-plus was delisted from Fireworks serverless
-        # (runs died with HTTP 404 at the coordinate station) — if this 404s at ~the same spot,
-        # check the model page for the current generation before debugging anything else.
-        default: "accounts/fireworks/models/qwen3p7-plus"
+        # glm-5p3-flash (since 2026-09-05) — same model as the reviewers; the flow bounds its
+        # reasoning at the coordinate station. Replaces qwen3p7-plus (sunset); its successor
+        # qwen3p8-max costs ~5.6× per call for no measured quality edge. Predecessor qwen3p6-plus
+        # was delisted (runs died with HTTP 404 at the coordinate station) — if this 404s at
+        # ~the same spot, check the model page for the current generation first.
+        default: "accounts/fireworks/models/glm-5p3-flash"
       conduit_base_url:
         description: "OpenAI-compatible model gateway base URL. Defaults to Fireworks (both default models live there); override per repo for a different gateway/proxy."
         type: string
