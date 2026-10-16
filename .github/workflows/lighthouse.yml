@@ -11,16 +11,32 @@ on:
         description: 'The deployment ID to find the associated PR'
         required: true
         type: number
+      runs-on:
+        description: 'JSON runner label(s), e.g. "ubuntu-latest" or ["self-hosted","linux","x64","homelab-vm"]'
+        required: false
+        type: string
+        default: '"ubuntu-latest"'
 
 jobs:
   lighthouse:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     permissions:
       contents: read
       pull-requests: write
       deployments: read
     steps:
       - uses: actions/checkout@v4
+
+      # Self-hosted runners have no Chrome preinstalled. chrome-launcher (used
+      # by lhci) reads CHROME_PATH. Hosted runners just get a fresh stable copy.
+      - name: Install Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Export CHROME_PATH
+        run: echo "CHROME_PATH=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
 
       - name: Run Lighthouse
         id: lighthouse
