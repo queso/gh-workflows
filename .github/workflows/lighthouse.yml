@@ -27,8 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Self-hosted runners have no Chrome preinstalled. chrome-launcher (used
-      # by lhci) reads CHROME_PATH. Hosted runners just get a fresh stable copy.
+      # Self-hosted runners have no Node or Chrome preinstalled. lhci collect
+      # spawns `node` from PATH, and chrome-launcher reads CHROME_PATH.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Install Chrome
         id: chrome
         uses: browser-actions/setup-chrome@v1
