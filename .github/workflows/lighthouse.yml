@@ -42,6 +42,13 @@ jobs:
       - name: Export CHROME_PATH
         run: echo "CHROME_PATH=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
 
+      # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor,
+      # so Chrome aborts with "No usable sandbox" on the homelab VMs. Hosted
+      # runners lift that restriction and keep the sandbox.
+      - name: Disable Chrome sandbox on self-hosted runners
+        if: runner.environment == 'self-hosted'
+        run: echo "LHCI_COLLECT__SETTINGS__CHROME_FLAGS=--no-sandbox" >> "$GITHUB_ENV"
+
       - name: Run Lighthouse
         id: lighthouse
         uses: treosh/lighthouse-ci-action@v12
